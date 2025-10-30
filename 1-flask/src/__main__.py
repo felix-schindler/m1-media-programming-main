@@ -1,10 +1,14 @@
+from os import path
 from flask import Flask, redirect, render_template, request, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
 
+base_path = path.dirname(path.dirname(__file__))
 
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///data.db"
+app = Flask(__name__, template_folder=path.join(base_path, "data", "templates"))
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    f"sqlite:///{path.join(base_path, 'data', 'sqlite.db')}"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.secret_key = "6514b0a4-72eb-4011-82c2-cc2d05ad4ef2"
 
