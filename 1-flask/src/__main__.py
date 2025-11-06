@@ -1,7 +1,9 @@
-from os import path
-from flask import Flask, redirect, render_template, request, url_for, session
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
+from os import path
+from uuid import uuid4
+
+from flask import Flask, redirect, render_template, request, session, url_for
+from flask_sqlalchemy import SQLAlchemy
 
 base_path = path.dirname(path.dirname(__file__))
 
@@ -10,7 +12,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
     f"sqlite:///{path.join(base_path, 'data', 'sqlite.db')}"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.secret_key = "6514b0a4-72eb-4011-82c2-cc2d05ad4ef2"
 
 db = SQLAlchemy(app)
 
@@ -56,5 +57,7 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         print("Tables created")
+
+    app.secret_key = uuid4()
 
     app.run(port=8000, debug=True)
