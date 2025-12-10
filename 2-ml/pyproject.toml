@@ -12,5 +12,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "ipykernel>=6.31.0",
+    "kagglehub>=0.3.13",
+    "pandas>=2.3.3",
     "scikit-learn>=1.6.1",
+    "seaborn>=0.13.2",
 ]
