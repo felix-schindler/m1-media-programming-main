@@ -58,6 +58,6 @@ if __name__ == "__main__":
         db.create_all()
         print("Tables created")
 
-    app.secret_key = uuid4()
+    app.secret_key = str(uuid4())
 
     app.run(port=8000, debug=True)
