@@ -2,86 +2,82 @@ from os import path
 
 import joblib
 import numpy as np
+import pandas as pd
 from flask import Flask, jsonify, render_template, request
 
-from cost import base_path
+from const import (
+    BASE_PATH,
+    CATEGORICAL_FEATURES,
+    FEATURES_PATH,
+    NUMERICAL_FEATURES,
+    PASS_MODEL_PATH,
+    SCORE_MODEL_PATH,
+)
 
-app = Flask(__name__, template_folder=path.join(base_path, "data", "templates"))
+app = Flask(__name__, template_folder=path.join(BASE_PATH, "data", "templates"))
 
-MODEL_DIR = path.join(base_path, "data", "ml")
-MODEL_PATH = path.join(MODEL_DIR, "model.pkl")
-FEATURE_NAMES_PATH = path.join(MODEL_DIR, "feature_names.pkl")
-
-# Platzhalter für das Modell und die Feature-Namen
-model = None
-feature_names = []
-
-try:
-    model = joblib.load(MODEL_PATH)
-    feature_names = joblib.load(FEATURE_NAMES_PATH)
-    # Wine Class Labels: 0, 1, 2. Wir geben die Bedeutung zurück.
-    # Abhängig vom Datensatz müsstest du das anpassen.
-    wine_classes = ["Class 0", "Class 1", "Class 2"]
-    print(f"ML Model und {len(feature_names)} Features erfolgreich geladen.")
-except Exception as e:
-    print(f"FEHLER beim Laden der Dateien in {MODEL_DIR}: {e}")
-    # Das Programm wird dennoch starten, aber Vorhersagen werden fehlschlagen
-    wine_classes = ["Model Error"]
+# Models und Feature-Namen laden
+score_model = joblib.load(SCORE_MODEL_PATH)
+pass_model = joblib.load(PASS_MODEL_PATH)
+encoded_feature_names = joblib.load(FEATURES_PATH)
 
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html", feature_names=feature_names)
+    return render_template(
+        "index.html",
+        raw_features=NUMERICAL_FEATURES,
+        categorical_features=CATEGORICAL_FEATURES,
+    )
 
 
 @app.route("/predictions", methods=["POST"])
 def predictions():
-    """
-    1. Empfängt die Formulardaten.
-    2. Konvertiert sie in ein NumPy-Array.
-    3. Macht die Vorhersage.
-    4. Gibt das Ergebnis als JSON zurück.
-    """
-    if model is None:
-        return jsonify({"error": "ML model not loaded."}), 500
-
     try:
-        # Die Daten kommen als JSON im Body des POST-Requests
         data = request.get_json()
 
-        # Sicherstellen, dass alle 13 Features übergeben wurden (der erwartete Input)
-        if len(data) != len(feature_names):
-            return jsonify(
-                {
-                    "error": f"Erwarte {len(feature_names)} Werte, aber erhielt {len(data)}."
-                }
-            ), 400
+        # Eingaben in einen DataFrame konvertieren
+        input_df = pd.DataFrame([data])
 
-        # Werte von Python-Liste zu NumPy-Array (für das Modell) konvertieren
-        # Das Modell erwartet ein 2D-Array: [[feature_1, feature_2, ...]]
-        input_data = np.array([data]).astype(float)
+        # Input trennen
+        input_numerical = input_df[NUMERICAL_FEATURES].astype(float)
+        input_categorical = input_df[CATEGORICAL_FEATURES]
 
-        # Vorhersage treffen (gibt z.B. 0, 1 oder 2 zurück)
-        prediction_index = model.predict(input_data)[0]
+        # One-Hot Encoding NUR der kategorialen Daten
+        input_encoded_categorical = pd.get_dummies(
+            input_categorical, columns=CATEGORICAL_FEATURES, drop_first=True
+        )
 
-        # Wahrscheinlichkeiten (optional, aber nützlich)
-        probabilities = model.predict_proba(input_data)[0]
+        # Alle vorbereiteten Features zusammenführen
+        input_prepared = pd.concat([input_numerical, input_encoded_categorical], axis=1)
 
-        # Ergebnis-Label
-        result_label = wine_classes[prediction_index]
+        # Spalten des Inputs mit trainierten Features überprüfen und anpassen
+        final_input = pd.DataFrame(0, index=np.arange(1), columns=encoded_feature_names)
 
-        # Ergebnis als JSON zurückgeben
+        for col in input_prepared.columns:
+            if col in final_input.columns:
+                final_input[col] = input_prepared[col].iloc[0]
+
+        # Konvertieren in ein NumPy-Array
+        input_array = final_input.values
+
+        # Vorhersagen
+        score_prediction = score_model.predict(input_array)[0]
+        passed_prediction_raw = pass_model.predict(input_array)[0]
+        passed_prediction_label = (
+            "Bestanden" if passed_prediction_raw == 1 else "Nicht bestanden"
+        )
+
         return jsonify(
             {
                 "success": True,
-                "prediction_label": result_label,
-                "prediction_index": int(prediction_index),
-                "probabilities": probabilities.tolist(),
+                "final_exam_score": round(float(score_prediction), 2),
+                "passed_exam_raw": int(passed_prediction_raw),
+                "passed_exam_label": passed_prediction_label,
             }
         )
 
     except Exception as e:
-        # Fängt Fehler bei der Datenkonvertierung oder der Vorhersage ab
         return jsonify({"error": f"Verarbeitungsfehler: {str(e)}"}), 500
 
 

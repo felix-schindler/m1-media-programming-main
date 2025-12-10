@@ -14,8 +14,8 @@ FEATURES_PATH = path.join(MODEL_DIR, "encoded_feature_names.pkl")
 
 # Features
 NUMERICAL_FEATURES = [
-    "age",
-    "weeks_in_course",
+    # "age",
+    # "weeks_in_course",
     "hours_spent_learning_per_week",
     "practice_problems_solved",
     "projects_completed",

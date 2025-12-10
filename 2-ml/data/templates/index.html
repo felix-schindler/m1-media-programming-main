@@ -9,94 +9,118 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     >
-    <script defer>
-      const form = document.getElementById("predictionForm");
-
-      form?.addEventListener("submit", async (event) => {
-        event.preventDefault();
-
-        // Elemente für die Ergebnis- und Fehlerausgabe zurücksetzen
+    <script>
+      window.onload = () => {
         const resultCard = document.getElementById("resultCard");
         const errorCard = document.getElementById("errorCard");
-        resultCard.classList.add("d-none");
-        errorCard.classList.add("d-none");
 
-        const form = event.target;
-        const dataToSend = []; // Liste für die 13 numerischen Werte
+        document.getElementById("predictionForm").addEventListener(
+          "submit",
+          async function (event) {
+            event.preventDefault();
 
-        // Alle Input-Felder auslesen
-        const inputs = form.querySelectorAll('input[type="number"]');
-        inputs.forEach((input) => {
-          const value = parseFloat(input.value);
-          dataToSend.push(value);
-        });
+            resultCard.classList.add("d-none");
+            errorCard.classList.add("d-none");
 
-        console.log({ dataToSend });
+            const form = event.target;
+            const dataToSend = {};
 
-        try {
-          const response = await fetch("/predictions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json", // Wichtig: Wir senden JSON!
-            },
-            body: JSON.stringify(dataToSend),
-          });
+            // Sammelt alle 12 Input-Werte in einem Dictionary {feature_name: value}
+            // Beachte: Select-Felder geben den String-Value zurück, Number-Felder den String-Wert der Zahl.
+            const allInputs = form.querySelectorAll("input, select");
+            allInputs.forEach((input) => {
+              dataToSend[input.name] = input.value;
+            });
 
-          if (response.ok) {
-            const result = await response.json();
+            console.log("Sende Daten:", dataToSend);
 
-            document.getElementById("predictionResult").textContent =
-              result.prediction_label;
+            try {
+              const response = await fetch("/predictions", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(dataToSend),
+              });
 
-            // Wahrscheinlichkeiten anzeigen
-            const probList = document.getElementById(
-              "probabilityList",
-            );
-            probList.innerHTML = "";
-            // Annahme: Die Klassen sind Class 0, Class 1, Class 2
-            ["Class 0", "Class 1", "Class 2"].forEach(
-              (label, index) => {
-                // Wahrscheinlichkeit auf 2 Dezimalstellen formatieren
-                const prob = (result.probabilities[index] * 100)
-                  .toFixed(2);
-                const listItem = document.createElement("li");
-                listItem.className = "list-group-item";
-                listItem.textContent = `${label}: ${prob}%`;
-                probList.appendChild(listItem);
-              },
-            );
+              if (response.ok) {
+                const result = await response.json();
 
-            resultCard.classList.remove("d-none"); // Ergebnis anzeigen
-          } else {
-            // Fehler vom Server (z.B. 400 oder 500)
-            document.getElementById("errorMessage").textContent =
-              result.error ||
-              "Unbekannter Fehler bei der Serververarbeitung.";
-            errorCard.classList.remove("d-none");
-          }
-        } catch (error) {
-          // Fehler beim fetch-Aufruf (z.B. Server nicht erreichbar)
-          console.error("Fetch Error:", error);
-          document.getElementById("errorMessage").textContent =
-            `Netzwerkfehler: Server nicht erreichbar oder falsche Antwort. (${error.message})`;
-          errorCard.classList.remove("d-none");
-        }
-      });
+                // Erfolgreiche Vorhersage
+                document.getElementById("scoreResult").textContent =
+                  result.final_exam_score;
+                document.getElementById("passResult").textContent =
+                  result.passed_exam_label;
+
+                // Style für das Bestehen anpassen
+                const passResultSpan = document.getElementById(
+                  "passResult",
+                );
+                passResultSpan.className = result.passed_exam_raw === 1
+                  ? "fw-bold text-success"
+                  : "fw-bold text-danger";
+
+                resultCard.classList.remove("d-none");
+              } else {
+                // Fehler vom Server
+                document.getElementById("errorMessage").textContent =
+                  result.error ||
+                  "Unbekannter Fehler bei der Serververarbeitung.";
+                errorCard.classList.remove("d-none");
+              }
+            } catch (error) {
+              // Netzwerkfehler
+              console.error("Fetch Error:", error);
+              document.getElementById("errorMessage").textContent =
+                `Netzwerkfehler: Server nicht erreichbar. (${error.message})`;
+              errorCard.classList.remove("d-none");
+            }
+          },
+        );
+      };
     </script>
-    <title>Predictions</title>
+    <title>Exam Performance Prediction</title>
   </head>
   <body>
-    <div class="container my-5">
-      <h1 class="mb-4">Wein-Klassifizierer</h1>
+    <div class="container mt-5">
+      <h1 class="mb-4">Python Prüfungsleistung Vorhersage</h1>
       <p class="lead">
-        Geben Sie die 13 chemischen Werte ein, um die Weinklasse vorherzusagen.
+        Geben Sie Ihre Lernmetriken ein, um die Abschlussnote und das Bestehen
+        vorherzusagen.
       </p>
 
       <form id="predictionForm" class="row g-3">
-        {% for feature in feature_names %}
+        {% for feature in raw_features %}
         <div class="col-md-4">
           <label for="{{ feature }}" class="form-label"
           >{{ feature | replace('_', ' ') | title }}</label>
+
+          {% if feature in categorical_features %}
+          <select
+            class="form-select"
+            id="{{ feature }}"
+            name="{{ feature }}"
+            required
+          >
+            {% if feature == 'country' %}
+            <option value="Germany">Germany</option>
+            <option value="USA" selected>USA</option>
+            <option value="India">India</option>
+            <option value="China">China</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Other">Other</option>
+            {% elif feature == 'prior_programming_experience' %}
+            <option value="Yes" selected>Ja</option>
+            <option value="No">Nein</option>
+            {% elif feature == 'uses_kaggle' or feature ==
+            'participates_in_discussion_forums' %}
+            <option value="Yes" selected>Ja</option>
+            <option value="No">Nein</option>
+            {% else %}
+            <option value="">Wählen Sie...</option>
+            {% endif %}
+          </select>
+          {% else %}
           <input
             type="number"
             step="any"
@@ -105,6 +129,7 @@
             name="{{ feature }}"
             required
           >
+          {% endif %}
         </div>
         {% endfor %}
 
@@ -117,14 +142,21 @@
 
       <div id="resultCard" class="card mt-5 d-none">
         <div class="card-header bg-success text-white">
-          Ergebnis
+          Ergebnis der Vorhersage
         </div>
         <div class="card-body">
           <h5 class="card-title">
-            Vorhergesagte Klasse: <span id="predictionResult"></span>
+            Erreichte Punktzahl (prognostiziert): <span
+              id="scoreResult"
+              class="fw-bold"
+            ></span>%
           </h5>
-          <p class="card-text text-muted">Details:</p>
-          <ul id="probabilityList" class="list-group list-group-flush"></ul>
+          <h5 class="card-title">
+            Prüfung bestanden (prognostiziert): <span
+              id="passResult"
+              class="fw-bold"
+            ></span>
+          </h5>
         </div>
       </div>
 
