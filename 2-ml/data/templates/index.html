@@ -10,6 +10,15 @@
       crossorigin="anonymous"
     >
     <script>
+      function updateTheme(isDark) {
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+      }
+
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        updateTheme(e.matches);
+      });
+      updateTheme((window.matchMedia('(prefers-color-scheme: dark)')).matches);
+
       window.onload = () => {
         const resultCard = document.getElementById("resultCard");
         const errorCard = document.getElementById("errorCard");
