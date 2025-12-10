@@ -2,7 +2,7 @@ Donnerstagstermin.
 
 # Git
 
-This repo is hosted at https://git.schindlerfelix.de/IMI-Master/m1-media-programming-main and mirrored to https://gitlab.rz.htw-berlin.de/s0600902/m1-media-programming as well as https://github.com/felix-schindler/m1-media-programming-main
+This repo is hosted on [Gitea](https://git.schindlerfelix.de/IMI-Master/m1-media-programming-main) and mirrored to [HTW GitLab](https://gitlab.rz.htw-berlin.de/s0600902/m1-media-programming) as well as [GitHub](https://github.com/felix-schindler/m1-media-programming-main).
 
 # Plan
 
