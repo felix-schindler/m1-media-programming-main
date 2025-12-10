@@ -1,180 +1,165 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prüfungsprognose</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
       rel="stylesheet"
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     >
+    <style>
+      select {
+        cursor: pointer;
+      }
+    </style>
     <script>
       function updateTheme(isDark) {
-        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+        document.documentElement.setAttribute(
+          "data-bs-theme",
+          isDark ? "dark" : "light",
+        );
       }
 
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        updateTheme(e.matches);
-      });
-      updateTheme((window.matchMedia('(prefers-color-scheme: dark)')).matches);
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", (e) => {
+          updateTheme(e.matches);
+        });
+      updateTheme(
+        (window.matchMedia("(prefers-color-scheme: dark)")).matches,
+      );
 
       window.onload = () => {
-        const resultCard = document.getElementById("resultCard");
-        const errorCard = document.getElementById("errorCard");
-
         document.getElementById("predictionForm").addEventListener(
           "submit",
-          async function (event) {
-            event.preventDefault();
+          async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
 
+            const resultCard = document.getElementById("resultCard");
+            const errorCard = document.getElementById("errorCard");
             resultCard.classList.add("d-none");
             errorCard.classList.add("d-none");
 
-            const form = event.target;
-            const dataToSend = {};
-
-            // Sammelt alle 12 Input-Werte in einem Dictionary {feature_name: value}
-            // Beachte: Select-Felder geben den String-Value zurück, Number-Felder den String-Wert der Zahl.
-            const allInputs = form.querySelectorAll("input, select");
-            allInputs.forEach((input) => {
-              dataToSend[input.name] = input.value;
-            });
-
-            console.log("Sende Daten:", dataToSend);
-
             try {
-              const response = await fetch("/predictions", {
+              const res = await fetch("/predictions", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(dataToSend),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
               });
 
-              if (response.ok) {
-                const result = await response.json();
+              const json = await res.json();
 
-                // Erfolgreiche Vorhersage
-                document.getElementById("scoreResult").textContent =
-                  result.final_exam_score;
-                document.getElementById("passResult").textContent =
-                  result.passed_exam_label;
+              if (json.error) throw new Error(json.error);
 
-                // Style für das Bestehen anpassen
-                const passResultSpan = document.getElementById(
-                  "passResult",
-                );
-                passResultSpan.className = result.passed_exam_raw === 1
-                  ? "fw-bold text-success"
-                  : "fw-bold text-danger";
+              document.getElementById("scoreValue").innerText =
+                json.final_exam_score + "%";
+              const passLabel = document.getElementById("passLabel");
+              passLabel.innerText = json.passed_exam_label;
+              passLabel.className = json.passed_exam_raw === 1
+                ? "display-6 fw-bold mt-2 text-success"
+                : "display-6 fw-bold mt-2 text-danger";
 
-                resultCard.classList.remove("d-none");
-              } else {
-                // Fehler vom Server
-                document.getElementById("errorMessage").textContent =
-                  result.error ||
-                  "Unbekannter Fehler bei der Serververarbeitung.";
-                errorCard.classList.remove("d-none");
-              }
-            } catch (error) {
-              // Netzwerkfehler
-              console.error("Fetch Error:", error);
-              document.getElementById("errorMessage").textContent =
-                `Netzwerkfehler: Server nicht erreichbar. (${error.message})`;
+              resultCard.classList.remove("d-none");
+            } catch (err) {
+              errorCard.innerText = err.message;
               errorCard.classList.remove("d-none");
             }
           },
         );
       };
     </script>
-    <title>Exam Performance Prediction</title>
   </head>
-  <body>
-    <div class="container mt-5">
-      <h1 class="mb-4">Python Prüfungsleistung Vorhersage</h1>
-      <p class="lead">
-        Geben Sie Ihre Lernmetriken ein, um die Abschlussnote und das Bestehen
-        vorherzusagen.
-      </p>
-
-      <form id="predictionForm" class="row g-3">
-        {% for feature in raw_features %}
-        <div class="col-md-4">
-          <label for="{{ feature }}" class="form-label">
-            {{ feature | replace('_', ' ') | title }}
-          </label>
-
-          {% if feature in categorical_features %}
-          <select
-            class="form-select"
-            id="{{ feature }}"
-            name="{{ feature }}"
-            required
-          >
-            {% if feature == 'country' %}
-            <option value="Germany" selected>Germany</option>
-            <option value="USA">USA</option>
-            <option value="India">India</option>
-            <option value="China">China</option>
-            <option value="Brazil">Brazil</option>
-            <option value="Other">Other</option>
-            {% elif feature == 'prior_programming_experience' %}
-            <option value="None" selected>Keine</option>
-            <option value="Beginner">Beginner</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Advanced">Advanced</option>
-            {% else %}
-            <option value="1" selected>Ja</option>
-            <option value="0">Nein</option>
-            {% endif %}
-          </select>
-          {% else %}
-          <input
-            type="number"
-            step="any"
-            class="form-control"
-            id="{{ feature }}"
-            name="{{ feature }}"
-            required
-          >
-          {% endif %}
-        </div>
-        {% endfor %}
-
-        <div class="col-12 mt-4">
-          <button type="submit" class="btn btn-primary btn-lg">
-            Vorhersage starten
-          </button>
-        </div>
-      </form>
-
-      <div id="resultCard" class="card mt-5 d-none">
-        <div class="card-header bg-success text-white">
-          Ergebnis der Vorhersage
-        </div>
-        <div class="card-body">
-          <h5 class="card-title">
-            Erreichte Punktzahl (prognostiziert): <span
-              id="scoreResult"
-              class="fw-bold"
-            ></span>%
-          </h5>
-          <h5 class="card-title">
-            Prüfung bestanden (prognostiziert): <span
-              id="passResult"
-              class="fw-bold"
-            ></span>
-          </h5>
-        </div>
+  <body class="bg-body-tertiary">
+    <div class="container py-5">
+      <div class="text-center mb-5">
+        <h1>🎓 Prüfungsprognose</h1>
+        <p class="lead">Basierend auf Machine Learning Pipeline</p>
       </div>
 
-      <div id="errorCard" class="card mt-5 d-none border-danger">
-        <div class="card-header bg-danger text-white">
-          Fehler
-        </div>
-        <div class="card-body">
-          <p id="errorMessage" class="card-text text-danger"></p>
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card shadow">
+            <div class="card-body">
+              <form id="predictionForm" class="row g-3">
+                {% for key, config in schema.items() %}
+                <div class="col-md-6">
+                  <label for="{{ key }}" class="form-label fw-bold"
+                  >{{ config.label }}</label>
+
+                  {% if config.type == 'select' %}
+                  <select
+                    class="form-select"
+                    id="{{ key }}"
+                    name="{{ key }}"
+                    required
+                  >
+                    {% for opt in config.options %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                  </select>
+
+                  {% elif config.type == 'binary' %}
+                  <select
+                    class="form-select"
+                    id="{{ key }}"
+                    name="{{ key }}"
+                    required
+                  >
+                    <option value="0">Nein</option>
+                    <option value="1">Ja</option>
+                  </select>
+
+                  {% else %}
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="{{ key }}"
+                    name="{{ key }}"
+                    min="{{ config.min }}"
+                    max="{{ config.max }}"
+                    step="{{ config.step }}"
+                    value="{{ config.default }}"
+                    required
+                  >
+                  <div class="form-text">
+                    Wert zwischen {{ config.min }} und {{ config.max }}
+                  </div>
+                  {% endif %}
+                </div>
+                {% endfor %}
+
+                <div class="col-12 mt-4 text-center">
+                  <button type="submit" class="btn btn-primary btn-lg w-50">
+                    🔮 Vorhersagen
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div id="resultCard" class="card mt-4 d-none">
+            <div class="card-body text-center">
+              <h3>Prognose</h3>
+              <div class="row mt-3">
+                <div class="col-6">
+                  <div class="display-4 fw-bold text-primary" id="scoreValue">
+                    --
+                  </div>
+                  <div class="text-muted">Erwartete Punkte</div>
+                </div>
+                <div class="col-6">
+                  <div class="display-6 fw-bold mt-2" id="passLabel">--</div>
+                  <div class="text-muted">Status</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="errorCard" class="alert alert-danger mt-4 d-none"></div>
         </div>
       </div>
     </div>

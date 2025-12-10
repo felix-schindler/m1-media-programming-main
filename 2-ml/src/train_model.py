@@ -3,77 +3,102 @@ from os import path
 import joblib
 import kagglehub
 import pandas as pd
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
 from sklearn.metrics import accuracy_score, mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from const import CATEGORICAL_FEATURES, MODEL_DIR, NUMERICAL_FEATURES
+from const import (
+    BINARY_FEATURES,
+    CATEGORICAL_FEATURES,
+    NUMERICAL_FEATURES,
+    PASS_MODEL_PATH,
+    SCORE_MODEL_PATH,
+)
 
-# --- Pfade und Daten laden ---
-DATA_PATH = path.join(
-    # https://www.kaggle.com/datasets/emonsharkar/python-learning-and-exam-performance-dataset
+# Dataset laden
+print("Lade Datensatz...")
+data_path = path.join(
     kagglehub.dataset_download(
         "emonsharkar/python-learning-and-exam-performance-dataset"
     ),
     "python_learning_exam_performance.csv",
 )
+df = pd.read_csv(data_path)
+df.dropna(inplace=True)  # Cleanup
 
+# Features und Targets definieren
+feature_cols = NUMERICAL_FEATURES + CATEGORICAL_FEATURES + BINARY_FEATURES
 
-# Lade den Datensatz
-df = pd.read_csv(DATA_PATH)
+X = df[feature_cols]
+y_score = df["final_exam_score"]
+y_passed = df["passed_exam"]
 
-# Zielspalten (Targets)
-TARGET_SCORE = "final_exam_score"
-TARGET_PASSED = "passed_exam"
-TARGETS = [TARGET_SCORE, TARGET_PASSED]
+# Preprocessing: Pipeline erstellen
+numeric_transformer = StandardScaler()  # numerische Werte standardisieren
+categorical_transformer = OneHotEncoder(
+    handle_unknown="ignore", sparse_output=False
+)  # kategoriale Werte: OneHotEncoder
+binary_transformer = "passthrough"  # binäre Werte bleiben gleich
 
-# Entferne Zeilen mit fehlenden Werten (vereinfacht das Projekt)
-df.dropna(inplace=True)
-
-# One-Hot Encoding der Kategorialen Features
-df_encoded_categorical = pd.get_dummies(
-    df[CATEGORICAL_FEATURES].copy(), columns=CATEGORICAL_FEATURES, drop_first=True
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", numeric_transformer, NUMERICAL_FEATURES),
+        ("cat", categorical_transformer, CATEGORICAL_FEATURES),
+        ("bin", binary_transformer, BINARY_FEATURES),
+    ]
 )
 
-# Stelle sicher, dass die binäre Zielvariable 'passed_exam' numerisch ist (0 oder 1)
-X = pd.concat([df[NUMERICAL_FEATURES].copy(), df_encoded_categorical], axis=1)
-y_passed = df[TARGET_PASSED].astype(int)
-y_score = df[TARGET_SCORE]
-
-# Features speichern
-feature_names = X.columns.tolist()
-joblib.dump(feature_names, path.join(MODEL_DIR, "encoded_feature_names.pkl"))
-print(f"Kodierte Feature-Namen ({len(feature_names)}) gespeichert.")
-
-# Training
-X_train_reg, X_test_reg, y_train_score, y_test_score = train_test_split(
+# Training: Regression (Score)
+print("Trainiere Regressor...")
+X_train, X_test, y_train, y_test = train_test_split(
     X, y_score, test_size=0.2, random_state=42
 )
-regressor = GradientBoostingRegressor(
-    n_estimators=200, learning_rate=0.1, max_depth=5, random_state=42
-)
-regressor.fit(X_train_reg, y_train_score)
-joblib.dump(regressor, path.join(MODEL_DIR, "score_regressor.pkl"))
 
-X_train_clf, X_test_clf, y_train_passed, y_test_passed = train_test_split(
+reg_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),
+        (
+            "regressor",
+            GradientBoostingRegressor(
+                n_estimators=200, learning_rate=0.1, max_depth=5, random_state=42
+            ),
+        ),
+    ]
+)
+
+reg_pipeline.fit(X_train, y_train)
+
+# Evaluation: Regressor
+y_pred = reg_pipeline.predict(X_test)
+print(f"Regressor MAE: {mean_absolute_error(y_test, y_pred):.2f}")
+print(f"Regressor R2: {r2_score(y_test, y_pred):.2f}")
+
+joblib.dump(reg_pipeline, SCORE_MODEL_PATH)
+
+# Training: Classifier (Passed)
+print("Trainiere Classifier...")
+X_train, X_test, y_train, y_test = train_test_split(
     X, y_passed, test_size=0.2, random_state=42
 )
-classifier = RandomForestClassifier(n_estimators=200, max_depth=5, random_state=42)
-classifier.fit(X_train_clf, y_train_passed)
-joblib.dump(classifier, path.join(MODEL_DIR, "pass_classifier.pkl"))
 
-# Evaluation
-predictions_reg = regressor.predict(X_test_reg)
-mae = mean_absolute_error(y_test_score, predictions_reg)
-r2 = r2_score(y_test_score, predictions_reg)
-predictions_clf = classifier.predict(X_test_clf)
-acc = accuracy_score(y_test_passed, predictions_clf)
+clf_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", preprocessor),  # Wir nutzen denselben Preprocessor Logik
+        (
+            "classifier",
+            RandomForestClassifier(n_estimators=200, max_depth=5, random_state=42),
+        ),
+    ]
+)
 
-print("\n--- Regressor (Score) ---")
-print(f"Durchschnittlicher Fehler (MAE): {mae:.2f} Punkte")
-print(f"Bestimmtheitsmaß (R2): {r2:.2f}/1.0")
+clf_pipeline.fit(X_train, y_train)
 
-print("\n--- Classifier (Bestanden) ---")
-print(f"Genauigkeit (Accuracy): {acc:.2f}")
+# Evaluation: Classifier
+y_pred = clf_pipeline.predict(X_test)
+print(f"Classifier Accuracy: {accuracy_score(y_test, y_pred):.2f}")
 
-print("\nAlle Modelle erfolgreich in 'data/ml' gespeichert.")
+joblib.dump(clf_pipeline, PASS_MODEL_PATH)
+print("Modelle gespeichert.")
