@@ -41,4 +41,5 @@ Zwei Modelle trainiert
 
 ## Link teilen
 
-https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://m1-mp-ml.onrender.com/
+* https://m1-mp-ml.onrender.com/
+* [QR-Code](https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https://m1-mp-ml.onrender.com/)
