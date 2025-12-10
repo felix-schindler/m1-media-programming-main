@@ -9,11 +9,135 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
       crossorigin="anonymous"
     >
-    <script>
+    <script defer>
+      const form = document.getElementById("predictionForm");
+
+      form?.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        // Elemente für die Ergebnis- und Fehlerausgabe zurücksetzen
+        const resultCard = document.getElementById("resultCard");
+        const errorCard = document.getElementById("errorCard");
+        resultCard.classList.add("d-none");
+        errorCard.classList.add("d-none");
+
+        const form = event.target;
+        const dataToSend = []; // Liste für die 13 numerischen Werte
+
+        // Alle Input-Felder auslesen
+        const inputs = form.querySelectorAll('input[type="number"]');
+        inputs.forEach((input) => {
+          const value = parseFloat(input.value);
+          dataToSend.push(value);
+        });
+
+        console.log({ dataToSend });
+
+        try {
+          const response = await fetch("/predictions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json", // Wichtig: Wir senden JSON!
+            },
+            body: JSON.stringify(dataToSend),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+
+            document.getElementById("predictionResult").textContent =
+              result.prediction_label;
+
+            // Wahrscheinlichkeiten anzeigen
+            const probList = document.getElementById(
+              "probabilityList",
+            );
+            probList.innerHTML = "";
+            // Annahme: Die Klassen sind Class 0, Class 1, Class 2
+            ["Class 0", "Class 1", "Class 2"].forEach(
+              (label, index) => {
+                // Wahrscheinlichkeit auf 2 Dezimalstellen formatieren
+                const prob = (result.probabilities[index] * 100)
+                  .toFixed(2);
+                const listItem = document.createElement("li");
+                listItem.className = "list-group-item";
+                listItem.textContent = `${label}: ${prob}%`;
+                probList.appendChild(listItem);
+              },
+            );
+
+            resultCard.classList.remove("d-none"); // Ergebnis anzeigen
+          } else {
+            // Fehler vom Server (z.B. 400 oder 500)
+            document.getElementById("errorMessage").textContent =
+              result.error ||
+              "Unbekannter Fehler bei der Serververarbeitung.";
+            errorCard.classList.remove("d-none");
+          }
+        } catch (error) {
+          // Fehler beim fetch-Aufruf (z.B. Server nicht erreichbar)
+          console.error("Fetch Error:", error);
+          document.getElementById("errorMessage").textContent =
+            `Netzwerkfehler: Server nicht erreichbar oder falsche Antwort. (${error.message})`;
+          errorCard.classList.remove("d-none");
+        }
+      });
     </script>
     <title>Predictions</title>
   </head>
   <body>
+    <div class="container my-5">
+      <h1 class="mb-4">Wein-Klassifizierer</h1>
+      <p class="lead">
+        Geben Sie die 13 chemischen Werte ein, um die Weinklasse vorherzusagen.
+      </p>
+
+      <form id="predictionForm" class="row g-3">
+        {% for feature in feature_names %}
+        <div class="col-md-4">
+          <label for="{{ feature }}" class="form-label"
+          >{{ feature | replace('_', ' ') | title }}</label>
+          <input
+            type="number"
+            step="any"
+            class="form-control"
+            id="{{ feature }}"
+            name="{{ feature }}"
+            required
+          >
+        </div>
+        {% endfor %}
+
+        <div class="col-12 mt-4">
+          <button type="submit" class="btn btn-primary btn-lg">
+            Vorhersage starten
+          </button>
+        </div>
+      </form>
+
+      <div id="resultCard" class="card mt-5 d-none">
+        <div class="card-header bg-success text-white">
+          Ergebnis
+        </div>
+        <div class="card-body">
+          <h5 class="card-title">
+            Vorhergesagte Klasse: <span id="predictionResult"></span>
+          </h5>
+          <p class="card-text text-muted">Details:</p>
+          <ul id="probabilityList" class="list-group list-group-flush"></ul>
+        </div>
+      </div>
+
+      <div id="errorCard" class="card mt-5 d-none border-danger">
+        <div class="card-header bg-danger text-white">
+          Fehler
+        </div>
+        <div class="card-body">
+          <p id="errorMessage" class="card-text text-danger"></p>
+        </div>
+      </div>
+    </div>
+
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
