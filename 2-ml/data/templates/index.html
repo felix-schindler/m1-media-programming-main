@@ -92,8 +92,9 @@
       <form id="predictionForm" class="row g-3">
         {% for feature in raw_features %}
         <div class="col-md-4">
-          <label for="{{ feature }}" class="form-label"
-          >{{ feature | replace('_', ' ') | title }}</label>
+          <label for="{{ feature }}" class="form-label">
+            {{ feature | replace('_', ' ') | title }}
+          </label>
 
           {% if feature in categorical_features %}
           <select
@@ -103,21 +104,20 @@
             required
           >
             {% if feature == 'country' %}
-            <option value="Germany">Germany</option>
-            <option value="USA" selected>USA</option>
+            <option value="Germany" selected>Germany</option>
+            <option value="USA">USA</option>
             <option value="India">India</option>
             <option value="China">China</option>
             <option value="Brazil">Brazil</option>
             <option value="Other">Other</option>
             {% elif feature == 'prior_programming_experience' %}
-            <option value="Yes" selected>Ja</option>
-            <option value="No">Nein</option>
-            {% elif feature == 'uses_kaggle' or feature ==
-            'participates_in_discussion_forums' %}
-            <option value="Yes" selected>Ja</option>
-            <option value="No">Nein</option>
+            <option value="None" selected>Keine</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
             {% else %}
-            <option value="">Wählen Sie...</option>
+            <option value="1" selected>Ja</option>
+            <option value="0">Nein</option>
             {% endif %}
           </select>
           {% else %}

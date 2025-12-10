@@ -26,7 +26,7 @@ encoded_feature_names = joblib.load(FEATURES_PATH)
 def index():
     return render_template(
         "index.html",
-        raw_features=NUMERICAL_FEATURES,
+        raw_features=NUMERICAL_FEATURES + CATEGORICAL_FEATURES,
         categorical_features=CATEGORICAL_FEATURES,
     )
 
