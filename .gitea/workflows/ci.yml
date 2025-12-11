@@ -1,8 +1,6 @@
-name: CI
-
-on:
-  push:
-  pull_request:
+name: Gitea Actions Demo
+run-name: ${{ gitea.actor }} is shipping the next version 🚀
+on: [push]
 
 jobs:
   discover:
