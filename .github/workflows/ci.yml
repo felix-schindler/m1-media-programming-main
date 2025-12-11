@@ -6,33 +6,33 @@ on:
 
 jobs:
   discover:
-      runs-on: ubuntu-latest
-      outputs:
-        matrix: ${{ steps.set-matrix.outputs.matrix }}
-      steps:
-        - uses: actions/checkout@v6
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
 
-        - name: Find directories
-          id: set-matrix
-          run: |
-            echo "Detecting projects..."
-            PROJECTS=$(find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' -printf '%P\n' | jq -R -s -c 'split("\n")[:-1]')
-            echo "Found projects: $PROJECTS"
-            echo "matrix=$PROJECTS" >> $GITHUB_OUTPUT
+      - name: Find directories
+        id: set-matrix
+        run: |
+          echo "Detecting projects..."
+          PROJECTS=$(find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' -printf '%P\n' | jq -R -s -c 'split("\n")[:-1]')
+          echo "Found projects: $PROJECTS"
+          echo "matrix=$PROJECTS" >> $GITHUB_OUTPUT
 
   lint:
     needs: discover
     runs-on: ubuntu-latest
     if: ${{ needs.discover.outputs.matrix != '[]' && needs.discover.outputs.matrix != '' }}
     strategy:
-          fail-fast: false # Wenn ein Projekt fehlschlägt, laufen die anderen weiter
-          matrix:
-            project: ${{ fromJson(needs.discover.outputs.matrix) }}
+      fail-fast: false # Wenn ein Projekt fehlschlägt, laufen die anderen weiter
+      matrix:
+        project: ${{ fromJson(needs.discover.outputs.matrix) }}
 
     name: Check ${{ matrix.project }}
     defaults:
-          run:
-            working-directory: ${{ matrix.project }}
+      run:
+        working-directory: ${{ matrix.project }}
 
     steps:
       - uses: actions/checkout@v6
