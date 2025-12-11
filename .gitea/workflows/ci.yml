@@ -4,19 +4,29 @@ on: [push]
 
 jobs:
   discover:
-      runs-on: ubuntu-latest
-      outputs:
-        matrix: ${{ steps.set-matrix.outputs.matrix }}
-      steps:
-        - uses: actions/checkout@v6
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
 
-        - name: Find directories
-          id: set-matrix
-          run: |
-            echo "Detecting projects..."
-            PROJECTS=$(find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' -printf '%P\n' | jq -R -s -c 'split("\n")[:-1]')
-            echo "Found projects: $PROJECTS"
-            echo "matrix=$PROJECTS" >> $GITHUB_OUTPUT
+      - name: Find directories
+        id: set-matrix
+        shell: bash
+        run: |
+          # 1. Finde Ordner
+          # 2. Sortiere sie (wichtig für Konsistenz)
+          # 3. jq erstellt ein Array und entfernt ALLES, was leer ist (length > 0)
+          PROJECTS=$(find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' -printf '%P\n' | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "Raw Projects: $PROJECTS"
+
+          # Fallback: Wenn das Ergebnis leer ist oder nur "[]", setze explizit ein leeres Array
+          if [ -z "$PROJECTS" ] || [ "$PROJECTS" == "[]" ]; then
+             echo "matrix=[]" >> $GITHUB_OUTPUT
+          else
+             echo "matrix=$PROJECTS" >> $GITHUB_OUTPUT
+          fi
 
   lint:
     needs: discover
