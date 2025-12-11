@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  discover:
+      runs-on: ubuntu-latest
+      outputs:
+        matrix: ${{ steps.set-matrix.outputs.matrix }}
+      steps:
+        - uses: actions/checkout@v6
+
+        - name: Find directories
+          id: set-matrix
+          # Findet alle Verzeichnisse (-type d) im aktuellen Ordner (maxdepth 1)
+          # Ignoriert versteckte Ordner wie .git (not -path '*/.*')
+          # Formatiert das Ergebnis als JSON-Array für die Matrix
+          run: |
+            echo "Detecting projects..."
+            PROJECTS=$(find . -maxdepth 1 -mindepth 1 -type d -not -path '*/.*' -printf '%P\n' | jq -R -s -c 'split("\n")[:-1]')
+            echo "Found projects: $PROJECTS"
+            echo "matrix=$PROJECTS" >> $GITHUB_OUTPUT
+
+  lint:
+    needs: discover
+    runs-on: ubuntu-latest
+    if: ${{ needs.discover.outputs.matrix != '[]' && needs.discover.outputs.matrix != '' }}
+    strategy:
+          fail-fast: false # Wenn ein Projekt fehlschlägt, laufen die anderen weiter
+          matrix:
+            project: ${{ fromJson(needs.discover.outputs.matrix) }}
+
+    name: Check ${{ matrix.project }}
+    defaults:
+          run:
+            working-directory: ${{ matrix.project }}
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found in ${{ matrix.project }}, skipping pip install."
+          fi
+
+      - name: Run tests
+        run: |
+          if command -v pytest > /dev/null 2>&1; then
+            pytest --maxfail=1 --disable-warnings -q
+          else
+            echo "Pytest not installed in ${{ matrix.project }}. Skipping tests."
+          fi
+
+      - name: Run linting
+        run: |
+          if command -v ruff > /dev/null 2>&1; then
+            echo "Ruff is installed. Running checks..."
+            ruff check .
+          else
+            echo "Ruff is NOT installed in ${{ matrix.project }}. Skipping linting."
+          fi
