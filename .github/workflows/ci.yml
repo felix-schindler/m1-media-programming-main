@@ -40,14 +40,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
+          if [ -f pyproject.toml ]; then
+            uv sync --no-dev
+          elif [ -f requirements.txt ]; then
+            uv venv
+            uv pip install -r requirements.txt
           else
-            echo "No requirements.txt found in ${{ matrix.project }}, skipping pip install."
+            echo "No dependencies found in ${{ matrix.project }}, skipping install."
           fi
+
+      - name: Activate virtual environment
+        run: echo "$PWD/.venv/bin" >> $GITHUB_PATH
 
       - name: Run tests
         run: |
